@@ -1,11 +1,12 @@
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <WiFiClient.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <esp_sleep.h>
 #include "config.h"
 
 
-#define STATUS_LED_PIN 2
+#define STATUS_LED_PIN 4
+#define FUNC_BUTTON 3
 
 
 void StatusLedOn()
@@ -16,6 +17,12 @@ void StatusLedOn()
 void StatusLedOff()
 {
     digitalWrite(STATUS_LED_PIN, HIGH);
+}
+
+void StartDeepSleep()
+{
+    esp_deep_sleep_enable_gpio_wakeup(1 << FUNC_BUTTON, ESP_GPIO_WAKEUP_GPIO_LOW);
+    esp_deep_sleep_start();
 }
 
 IPAddress IpLocal;
@@ -37,7 +44,6 @@ void setup() {
     if (!WiFi.config(IpLocal, IpGateway, IpMask, IpDns1, IpDns2)) {
         return;
     }
-
     WiFi.begin(WIFI_SSID, WIFI_PASSWD);
     const uint32_t delayTimeMs = 5;
     uint32_t timeout = 0;
@@ -49,14 +55,13 @@ void setup() {
         }
     }
 
-    WiFiClient client;
     HTTPClient http;
     String requestBaseUrl = REQUEST_BASE_URL;
-    uint64_t seckey = (uint64_t)ESP.random() * (uint64_t)PRESHARED_KEY;
+    uint64_t seckey = (uint64_t)esp_random() * (uint64_t)PRESHARED_KEY;
     String seckeyStr = String(seckey);
     String url = requestBaseUrl + "?seckey=";
     url += seckeyStr;
-    http.begin(client, url.c_str());
+    http.begin(url.c_str());
     int httpResponseCode = http.GET();
     
     if (httpResponseCode < 200 || httpResponseCode >= 300) {
@@ -66,7 +71,7 @@ void setup() {
     http.end();
 
     StatusLedOff();
-    ESP.deepSleep(0);
+    StartDeepSleep();
 }
 
 void loop() {
@@ -77,6 +82,6 @@ void loop() {
     delay(50);
     blinkCount++;
     if (blinkCount > 50) {
-        ESP.deepSleep(0);
+        StartDeepSleep();
     }
 }
